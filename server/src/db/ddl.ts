@@ -1,0 +1,133 @@
+/**
+ * Idempotent schema for Postgres (Supabase). Run automatically on boot, and
+ * also available as supabase/schema.sql for the Supabase SQL editor.
+ *
+ * Row Level Security is switched ON for every table with NO policies. Supabase
+ * exposes the `public` schema through its Data API using the public anon key,
+ * so without RLS anyone could read (password hashes!) or edit these tables
+ * straight from the internet. The server connects as the `postgres` role,
+ * which bypasses RLS, so the app itself is unaffected.
+ */
+export const TABLES = [
+  'users',
+  'games',
+  'moves',
+  'statistics',
+  'friendships',
+  'notifications',
+  'tournaments',
+  'tournament_players',
+  'tournament_matches',
+];
+
+export const DDL = `
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  username TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  elo_rating INTEGER DEFAULT 1200,
+  avatar TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_unique ON users (lower(email));
+CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_unique ON users (lower(username));
+
+CREATE TABLE IF NOT EXISTS games (
+  id TEXT PRIMARY KEY,
+  white_id TEXT NOT NULL REFERENCES users(id),
+  black_id TEXT NOT NULL,
+  winner_id TEXT,
+  pgn_moves TEXT DEFAULT '',
+  started_at TIMESTAMPTZ DEFAULT now(),
+  ended_at TIMESTAMPTZ,
+  status TEXT DEFAULT 'ACTIVE',
+  ai_difficulty TEXT DEFAULT 'medium'
+);
+
+CREATE TABLE IF NOT EXISTS moves (
+  id TEXT PRIMARY KEY,
+  game_id TEXT NOT NULL REFERENCES games(id),
+  turn_number INTEGER NOT NULL,
+  from_square TEXT NOT NULL,
+  to_square TEXT NOT NULL,
+  captured_piece TEXT,
+  promoted_to_king BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS statistics (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL UNIQUE REFERENCES users(id),
+  wins INTEGER DEFAULT 0,
+  losses INTEGER DEFAULT 0,
+  draws INTEGER DEFAULT 0,
+  total_moves INTEGER DEFAULT 0,
+  average_time INTEGER,
+  max_win_streak INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS friendships (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  friend_id TEXT NOT NULL REFERENCES users(id),
+  status TEXT DEFAULT 'PENDING',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (user_id, friend_id)
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  type TEXT NOT NULL,
+  content TEXT NOT NULL,
+  read BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS tournaments (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  created_by TEXT NOT NULL REFERENCES users(id),
+  max_players INTEGER DEFAULT 8,
+  status TEXT DEFAULT 'WAITING',
+  started_at TIMESTAMPTZ,
+  ended_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS tournament_players (
+  id TEXT PRIMARY KEY,
+  tournament_id TEXT NOT NULL REFERENCES tournaments(id),
+  user_id TEXT NOT NULL REFERENCES users(id),
+  seed INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'ACTIVE',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (tournament_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS tournament_matches (
+  id TEXT PRIMARY KEY,
+  tournament_id TEXT NOT NULL REFERENCES tournaments(id),
+  round INTEGER NOT NULL,
+  player1_id TEXT REFERENCES users(id),
+  player2_id TEXT REFERENCES users(id),
+  winner_id TEXT REFERENCES users(id),
+  game_id TEXT REFERENCES games(id),
+  next_match_id TEXT,
+  status TEXT DEFAULT 'PENDING',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS moves_game_turn_unique ON moves (game_id, turn_number);
+CREATE INDEX IF NOT EXISTS idx_games_white ON games (white_id);
+CREATE INDEX IF NOT EXISTS idx_games_black ON games (black_id);
+CREATE INDEX IF NOT EXISTS idx_games_started ON games (started_at);
+CREATE INDEX IF NOT EXISTS idx_users_elo ON users (elo_rating);
+CREATE INDEX IF NOT EXISTS idx_friend_friend ON friendships (friend_id);
+CREATE INDEX IF NOT EXISTS idx_tmatches_tournament ON tournament_matches (tournament_id);
+CREATE INDEX IF NOT EXISTS idx_tmatches_game ON tournament_matches (game_id);
+${TABLES.map((t) => `ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY;`).join('\n')}
+`;

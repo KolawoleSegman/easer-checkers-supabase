@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "Easer Checkers",
+    "slug": "easer-checkers",
+    "scheme": "easercheckers",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#101a18"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.easer.checkers"
+    },
+    "android": {
+      "package": "com.easer.checkers",
+      "adaptiveIcon": {
+        "backgroundColor": "#101a18"
+      }
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-av"
+    ],
+    "extra": {
+      "apiUrl": "https://easer-checker-backend.onrender.com"
+    }
+  }
+}
