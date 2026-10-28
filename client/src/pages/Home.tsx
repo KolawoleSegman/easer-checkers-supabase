@@ -52,8 +52,17 @@ const Home = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // ✅ SAFE: localStorage may contain the literal string "undefined"
+    // (written when a bad register/login handler did
+    //  JSON.stringify(undefined)). Parsing that throws and blanks the page.
     const stored = localStorage.getItem("user");
-    if (stored) setUser(JSON.parse(stored));
+    if (stored && stored !== "undefined" && stored !== "null") {
+      try {
+        setUser(JSON.parse(stored));
+      } catch {
+        localStorage.removeItem("user");
+      }
+    }
     fetchStats();
     fetchRecentGames();
     // The user saved at login has no avatar; refresh it so the header is right.
